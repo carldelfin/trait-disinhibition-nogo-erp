@@ -6,6 +6,8 @@
 
 This repository contains all analysis code used for the manuscript subsequently published as [Trait disinhibition and NoGo event-related potentials in violent mentally disordered offenders and healthy controls](https://www.frontiersin.org/articles/10.3389/fpsyt.2020.577491/full). Feel free to use and/or modify any code in this repository for your own research.
 
+Note that this repository is a mirror of [this](https://osf.io/yscdh/), originally published on the Open Science Framework. 
+
 ---
 
 ## Software used
