@@ -1,0 +1,425 @@
+---
+title: "Results"
+output: word_document
+---
+
+```{r libraries, include=FALSE}
+library(here)
+library(tidyverse)
+library(testthat)
+library(rstan)
+library(psych)
+library(GPArotation)
+library(pander)
+library(brms)
+library(broom)
+library(reshape2)
+library(ggridges)
+library(patchwork)
+library(scales)
+library(devtools)
+library(tidybayes)
+library(flextable)
+library(officer)
+```
+
+```{r options, include=FALSE}
+################################################################################
+overwrite <- FALSE
+overwrite_brms <- FALSE
+################################################################################
+
+n2_lower_bound <- 225
+n2_upper_bound <- 325
+
+p3_lower_bound <- 325
+p3_upper_bound <- 625
+
+seed <- 2020
+cores <- 8
+chains <- 8
+iter <- 4000
+warmup <- 1000
+refresh <- 0
+
+control_vs_patient <-
+  scale_fill_manual(values = c("#386cb0", "#d95f02"),
+                    labels = c("Controls", "Patients"))
+
+erp_colors <-
+  scale_color_manual(values = c("#386cb0", "#d95f02"),
+                     labels = c("Controls", "MDOs"))
+
+categorical <- c("gray", "black")
+difference_color <- "#55C667"
+
+axis_text_size <- 9
+title_text_size <- 11
+axis_title_size <- 12
+subtitle_text_size <- 10
+legend_text_size <- 10
+
+dir.create(here("/analysis/output"))
+dir.create(here("/analysis/output/tables"))
+dir.create(here("/analysis/output/figures"))
+dir.create(here("/analysis/data/tmp"))
+```
+
+```{r helper functions, include=FALSE}
+source(here("analysis/scripts/r/00_helper_functions.R"))
+```
+
+```{r brms models, include=FALSE}
+source(here("analysis/scripts/r/01_brms_models.R"))
+```
+
+```{r read data, include=FALSE}
+source(here("analysis/scripts/r/02_read_data.R"))
+merged_data <- readRDS(here("analysis/data/tmp/merged_data.rds"))
+```
+
+## Materials and Methods
+
+### Measures
+
+#### Trait disinhibition 
+
+```{r trait disinhibition reliability, include=FALSE}
+if (!file.exists(here("analysis/data/tmp/gen_dis_reliability.rds")) || overwrite == TRUE) {
+  merged_data <- readRDS(here("analysis/data/tmp/merged_data.rds"))
+  gen_dis_reliability <-
+    merged_data %>% 
+    select(esi1, esi9, esi10, esi19, esi28,
+           esi36, esi41, esi44, esi49, esi65,
+           esi73, esi84, esi90, esi92, esi95,
+           esi112, esi125, esi143, esi144, esi152) %>%
+    omega(m = .,
+          fm = "ml",
+          n.factors = 1,
+          plot = FALSE,
+          lavaan = TRUE)
+  
+  gen_dis_reliability <- as.data.frame(gen_dis_reliability[c(3, 4)]) %>%
+    mutate_if(is.numeric, round, 2)
+  
+  saveRDS(gen_dis_reliability, here("analysis/data/tmp/gen_dis_reliability.rds"))
+}
+  
+gen_dis_reliability <- readRDS(here("analysis/data/tmp/gen_dis_reliability.rds"))
+```
+
+The ESI-BF~DIS~ showed high internal reliability in the current study, with Cronbach’s alpha = `r gen_dis_reliability$alpha` and McDonald’s Omega total = `r gen_dis_reliability$omega.tot`.
+
+### Procedure
+
+#### EEG data preprocessing
+
+```{r group difference in preprocessing, include=FALSE}
+source(here("analysis/scripts/r/03_robust_group_differences_preprocessing.R"))
+```
+
+`r length(remove)` participant in the patient group had less than four correct NoGo trials left after artifact rejection, and was excluded.
+
+#### Reliability analysis
+
+```{r reliability analysis, include=FALSE}
+source(here("analysis/scripts/r/04_reliability_analysis.R"))
+```
+
+The reliability of the Go/NoGo paradigm was high, with ⍴~SB~ = `r reliability_models[2, 2]` for median NoGo response time and ⍴~SB~ = `r reliability_models[1, 2]` for NoGo accuracy. With the exception of NoGo N2 latency (⍴~SB~ = `r reliability_models[5, 2]`), the reliability of all ERP measurements was high, with ⍴~SB~ = `r reliability_models[3, 2]` for NoGo N2~WIN~, ⍴~SB~ = `r reliability_models[4, 2]` for NoGo N2~MOV~, ⍴~SB~ = `r reliability_models[6, 2]` for NoGo P3~WIN~, ⍴~SB~ = `r reliability_models[7, 2]` for NoGo P3~MOV~, and ⍴~SB~ = `r reliability_models[8, 2]` for NoGo P3 latency.
+
+## Results
+
+### Sample characteristics
+
+#### Age and education
+
+```{r age and education, echo=FALSE, message=FALSE, warning=FALSE}
+if (!file.exists(here("analysis/data/tmp/group_differences_age.rds")) || overwrite == TRUE) {
+  brms_robust_group_diff <- readRDS(here("analysis/scripts/brms/brms_robust_group_diff.rds"))
+  group_diff_age <- get_group_difference(merged_data, "age")
+  saveRDS(group_diff_age, here("analysis/data/tmp/group_differences_age.rds"))
+}
+
+age_summary <-
+  readRDS(here("analysis/data/tmp/group_differences_age.rds")) %>%
+  mutate(
+      mean_whole_group = mean,
+      range_whole_group = range,
+      mean_controls = mean.1,
+      range_controls = range.1,
+      mean_patients = mean.2,
+      range_patients = range.2) %>%
+    select(-c(mean, range, mean.1, range.1, mean.2, range.2)) %>%
+    mutate_if(is.numeric, round, 2) %>%
+    mutate(diff = paste0(diff, " [", diff_lower_90, ", ", diff_upper_90, "]"),
+           delta_est = paste0(delta_est, " [", delta_est_lower_90, ", ", delta_est_upper_90, "]"),
+           Measure = variable) %>%
+    select(Measure,
+           mean_whole_group, range_whole_group,
+           mean_controls, range_controls,
+           mean_patients, range_patients,
+           diff, delta_est, p_direction)
+
+education_summary <- merged_data %>%
+  group_by(group, education) %>%
+  summarise(n = n()) %>%
+  mutate(percent = round(n / sum(n) * 100, 0))
+
+order <- education_summary %>%
+  arrange(desc(n))
+
+education_summary <- education_summary %>%
+  mutate(percent = round(n / sum(n) * 100, 0),
+         education = factor(education, unique(order$education)))
+
+education_percent <- education_summary %>% 
+             group_by(group) %>%
+             filter(percent == max(percent)) %>%
+             arrange(group)
+``` 
+
+Participants were on average `r strsplit(age_summary$mean_whole_group," ")[[1]][1]` years old (SD = `r strsplit(age_summary$mean_whole_group," ")[[1]][3]`, range = `r age_summary$range_whole_group`). MDOs were approximately `r round(as.numeric(strsplit(age_summary$diff," ")[[1]][1]), 0)` years older than controls, with an average of `r strsplit(age_summary$mean_patients," ")[[1]][1]` years (SD = `r strsplit(age_summary$mean_patients," ")[[1]][3]`, range = `r age_summary$range_patients`) for MDOs and `r strsplit(age_summary$mean_controls," ")[[1]][1]` years (SD = `r strsplit(age_summary$mean_controls," ")[[1]][3]`, range = `r age_summary$range_controls`) for controls. The estimated difference was `r age_summary$diff`, with $\hat{\delta}$ = `r age_summary$delta_est` and P~D~ = `r age_summary$p_direction`%. The most frequent level of education in both groups was having finished high school (`r as.numeric(education_percent[1, 4])`% in the control group and `r as.numeric(education_percent[2, 4])`% in the patient group), although `r as.numeric(education_summary[4, 3])` participants in the patient group (`r as.numeric(education_summary[4, 4])`%) had not finished primary school.
+
+#### MDO group clinical characteristics
+
+```{r clinical characteristics, message=FALSE, warning=FALSE, include=FALSE}
+primary_dx <-
+  merged_data %>%
+  filter(group == "patient") %>%
+  group_by(primary_diagnosis) %>%
+  summarise(n = n()) %>%
+  mutate(percent = round(n / sum(n) * 100, 0)) %>%
+  arrange(desc(n))
+
+additional_dx_summary <- 
+  merged_data %>%
+  filter(group == "patient") %>%
+  summarize(n = n(),
+            mean = round(mean(num_additional_dx), 2),
+            median = median(num_additional_dx),
+            sd = round(sd(num_additional_dx), 2),
+            min = min(num_additional_dx),
+            max = max(num_additional_dx))
+
+additional_dx_list <-
+  rbind(merged_data[, "additional_diagnosis_1"],
+        merged_data[, "additional_diagnosis_2"],
+        merged_data[, "additional_diagnosis_3"],
+        merged_data[, "additional_diagnosis_4"])
+
+additional_dx_list <- 
+  sort(table(additional_dx_list), decreasing = TRUE) %>%
+  as.data.frame() %>%
+  mutate(percent = Freq / 27 * 100) %>%
+  mutate_if(is.numeric, round, 0)
+
+pharma_data <- subset(merged_data, group == "patient") %>%
+  select(antipsychotics,
+         antidepressants,
+         sedatives_hypnotics_bz_bz_like,
+         sedatives_hypnotics_non_bz_non_bz_like,
+         anticholinergics,
+         antiepileptics,
+         adhd_substances,
+         sud_substances,
+         somatic_substances) %>%
+  mutate(total_num_pharma = rowSums(., na.rm = TRUE))
+
+pharma_data_sum <- 
+  pharma_data %>%
+    summarize(n = n(),
+              mean = round(mean(total_num_pharma), 2),
+              median = median(total_num_pharma),
+              sd = round(sd(total_num_pharma), 2),
+              min = min(total_num_pharma),
+              max = max(total_num_pharma))
+```
+
+Overall, MDOs (N = `r c(table(merged_data$group))[[2]]`) presented with a wide range of mental disorders. The most common primary diagnosis was `r str_to_lower(primary_dx[1, 1])` (N = `r as.numeric(primary_dx[1, 2])`, `r as.numeric(primary_dx[1, 3])`%), while the most common additional diagnoses were `r str_to_lower(additional_dx_list[1, 1])` (N = `r additional_dx_list[1, 2]`, `r additional_dx_list[1, 3]`%) and `r str_to_lower(additional_dx_list[2, 1])` (N = `r additional_dx_list[2, 2]`, `r additional_dx_list[2, 3]`%). Most MDOs had `r additional_dx_summary$median` additional diagnosis (i.e., median = `r additional_dx_summary$median`), ranging from  `r additional_dx_summary$min` to `r additional_dx_summary$max`. See Figure X for a diagnostic overview. Most MDOs also received some form of pharmacological treatment (median = `r pharma_data_sum$median` different substances, range = `r pharma_data_sum$min` to `r pharma_data_sum$max`), although `r pharma_data %>% filter(total_num_pharma == 0) %>% nrow()` MDOs did not receive any pharmacological treatment at all. An overview of pharmacological treatment is presented in Table 1.
+
+```{r pharmacological data, echo=FALSE, message=FALSE, warning=FALSE}
+ft <-
+  melt(pharma_data, measure.vars = c("antipsychotics",
+                                   "antidepressants",
+                                   "sedatives_hypnotics_bz_bz_like",
+                                   "sedatives_hypnotics_non_bz_non_bz_like",
+                                   "anticholinergics",
+                                   "antiepileptics",
+                                   "adhd_substances",
+                                   "sud_substances",
+                                   "somatic_substances")) %>%
+  mutate(variable = gsub("antipsychotics", "Antipsychotics", variable),
+         variable = gsub("antidepressants", "Antidepressants", variable),
+         variable = gsub("sedatives_hypnotics_bz_bz_like", "Benzodiazepine sedatives/hypnotics", variable),
+         variable = gsub("sedatives_hypnotics_non_bz_non_bz_like", "Non-benzodiazepine sedatives/hypnotics", variable),
+         variable = gsub("anticholinergics", "Anticholinergics", variable),
+         variable = gsub("antiepileptics", "Antiepileptics", variable),
+         variable = gsub("adhd_substances", "ADHD substances", variable),
+         variable = gsub("sud_substances", "SUD substances", variable),
+         variable = gsub("somatic_substances", "Somatic substances", variable)) %>%
+  group_by(variable, value) %>%
+  summarise(n = n()) %>%
+  mutate(percent = round((n / sum(n) * 100), 0)) %>%
+  na.omit() %>%
+  mutate(n = paste0(n, " (", percent, "%)")) %>%
+  select(variable, n) %>%
+  data.frame() %>%
+  flextable() %>%
+  set_header_labels(variable = "Pharmacological category",
+                    n = "N (%)") %>%
+  set_caption("Table 1. Overview of pharmacological treatment in the mentally disordered offenders group (N = 27).") %>%
+  align(j = 1, align = "left", part = "all") %>%
+  align(j = 2, align = "middle", part = "all") %>%
+  autofit()
+
+if (!file.exists(here("analysis/output/tables/table_1_pharmacological_treatment.docx")) || overwrite == TRUE) {
+  read_docx() %>%
+    body_add_flextable(value = ft, split = FALSE) %>%
+    body_end_section_landscape() %>% # a landscape section is ending here
+    print(target = here("analysis/output/tables/table_1_pharmacological_treatment.docx"))
+}
+```
+
+```{r criminal history, message=FALSE, warning=FALSE, include=FALSE}
+sentence_summary <-
+  merged_data %>%
+  filter(group == "patient") %>%
+  select(age_first_crime_sentence, age_first_crime_reported, total_num_sentences) %>%
+  psych::describe(ranges = TRUE, check = TRUE) %>%
+  as.data.frame() %>%
+  rownames_to_column() %>%
+  select(rowname, n, mean, sd, median, min, max) %>%
+  mutate_if(is.numeric, round, 2)
+
+crime_summary <-
+  merged_data %>%
+  filter(group == "patient") %>%
+  mutate(crimes_under_treatment = factor(crimes_under_treatment),
+         deadly_violence = factor(deadly_violence),
+         assault_inc_agg = factor(assault_inc_agg),
+         sexual_crimes = factor(sexual_crimes)) %>%
+  select(crimes_under_treatment, deadly_violence, assault_inc_agg, sexual_crimes) %>%
+  melt()
+
+deadly_violence <- 
+  crime_summary %>% 
+  group_by(deadly_violence) %>% 
+  tally() %>%
+  mutate(percent = n / 27 * 100) %>%
+  mutate_if(is.numeric, round, 1) %>%
+  as.data.frame()
+
+assault_inc_agg <- 
+  crime_summary %>% 
+  group_by(assault_inc_agg) %>% 
+  tally() %>%
+  mutate(percent = n / 27 * 100) %>%
+  mutate_if(is.numeric, round, 1) %>%
+  as.data.frame()
+
+sexual_crimes <- 
+  crime_summary %>% 
+  group_by(sexual_crimes) %>% 
+  tally() %>%
+  mutate(percent = n / 27 * 100) %>%
+  mutate_if(is.numeric, round, 1) %>%
+  as.data.frame()
+```
+
+The criminal history of the MDOs was heterogeneous, with a mean total number of `r sentence_summary[3, 3]` sentences (SD = `r sentence_summary[3, 4]`), ranging from `r sentence_summary[3, 6]` to `r sentence_summary[3, 7]`. The mean age at first sentencing was `r sentence_summary[1, 3]` years (SD = `r sentence_summary[1, 4]`, range = `r sentence_summary[1, 6]` to `r sentence_summary[1, 7]`; note that 15 is the minimum age for criminal sentencing in Sweden), while the mean age at first reported crime was `r sentence_summary[2, 3]` years (SD = `r sentence_summary[2, 4]`, range = `r sentence_summary[2, 6]` to `r sentence_summary[2, 7]`). 
+
+As per inclusion criteria, all MDOs had at some point been sentenced for a violent crime. `r deadly_violence[2, 2] + deadly_violence[3, 2]` MDOs (`r deadly_violence[2, 3] + deadly_violence[3, 3]`%) had committed acts of deadly violence, of which `r deadly_violence[3, 2]` (`r deadly_violence[3, 3]`%) repeatedly (i.e., on two or more occasions). A total of `r assault_inc_agg[2, 2] + assault_inc_agg[3, 2]` MDOs (`r assault_inc_agg[2, 3] + assault_inc_agg[3, 3]`%) had committed assault, including aggravated, of which `r assault_inc_agg[3, 2]` (`r assault_inc_agg[3, 3]`%) had done so repeatedly. Finally, `r sexual_crimes[2, 2] + sexual_crimes[3, 2]` MDOs (`r sexual_crimes[2, 3] + sexual_crimes[3, 3]`%) had committed sexual crimes, of which `r sexual_crimes[3, 2]` (`r sexual_crimes[3, 3]`%) repeatedly.
+
+### Group differences
+
+See Table 2 in output directory.
+
+```{r group difference models, message=FALSE, warning=FALSE, include=FALSE}
+source(here("analysis/scripts/r/05_robust_group_differences.R"))
+```
+
+### Correlations
+
+See Table 3 in output directory.
+
+```{r correlation models, message=FALSE, warning=FALSE, include=FALSE}
+source(here("analysis/scripts/r/06_robust_correlation_general_dis.R"))
+source(here("analysis/scripts/r/07_robust_correlation_nogo_acc.R"))
+source(here("analysis/scripts/r/08_correlation_tables.R"))
+```
+
+```{r exploratory analyses, message=FALSE, warning=FALSE, include=FALSE}
+if (!file.exists(here("analysis/data/tmp/correlation_mean_nogo_rt_formatted.rds")) || overwrite == TRUE) {
+  brms_robust_correlation <- readRDS(here("analysis/scripts/brms/brms_robust_correlation.rds"))
+  correlation_mean_nogo_rt <-
+    rbind(
+      get_correlation(merged_data, "median_nogo_rt", "nogo_accuracy"),
+      get_correlation(merged_data, "median_nogo_rt", "p3_latency"))
+
+  correlation_mean_nogo_rt_formatted <- correlation_mean_nogo_rt %>%
+    mutate_if(is.numeric, round, 2) %>%
+    mutate(rho = paste0(rho, " [", rho_lower_90, ", ", rho_upper_90, "]")) %>%
+    select(variable_2, rho, p_direction)
+
+  saveRDS(correlation_mean_nogo_rt_formatted, here("analysis/data/tmp/correlation_mean_nogo_rt_formatted.rds"))
+}
+
+if (!file.exists(here("analysis/data/tmp/group_differences_nogo_rt_formatted.rds")) || overwrite == TRUE) {
+  brms_robust_group_diff <- readRDS(here("analysis/scripts/brms/brms_robust_group_diff.rds"))
+  group_differences_nogo_rt <- get_group_difference(merged_data, "median_nogo_rt")
+
+  group_differences_nogo_rt_full <- 
+    group_differences_nogo_rt %>%
+  mutate(
+    mean_whole_group = mean,
+    range_whole_group = range,
+    mean_controls = mean.1,
+    range_controls = range.1,
+    mean_patients = mean.2,
+    range_patients = range.2) %>%
+  select(-c(mean, range, mean.1, range.1, mean.2, range.2))
+
+  group_differences_nogo_rt_formatted <- group_differences_nogo_rt_full %>%
+    mutate_if(is.numeric, round, 2) %>%
+    mutate(diff = paste0(diff, " [", diff_lower_90, ", ", diff_upper_90, "]"),
+           delta_est = paste0(delta_est, " [", delta_est_lower_90, ", ", delta_est_upper_90, "]"),
+           p_direction = paste0(round(p_direction * 100, 2), "%")) %>%
+    select(variable,
+           mean_whole_group, range_whole_group,
+           mean_controls, range_controls,
+           mean_patients, range_patients,
+           diff, delta_est, p_direction)
+
+  saveRDS(group_differences_nogo_rt_full, here("analysis/data/tmp/group_differences_nogo_rt_full.rds"))
+  saveRDS(group_differences_nogo_rt_formatted, here("analysis/data/tmp/group_differences_nogo_rt_formatted.rds"))
+}
+
+group_difference_nogo_rt <- readRDS(here("analysis/data/tmp/group_differences_nogo_rt_formatted.rds"))
+correlation_mean_nogo_rt_formatted <- readRDS(here("analysis/data/tmp/correlation_mean_nogo_rt_formatted.rds"))
+```
+
+### Exploratory analyses
+
+MDOs had longer median NoGo RTs than controls, responding on average `r group_difference_nogo_rt[, "diff"]` ms later than controls, indicating a relatively robust and large ($\hat{\delta}$ = `r group_difference_nogo_rt[, "delta_est"]`) group difference. Furthermore, median NoGo RT showed positive, moderate, and robust correlations with both NoGo accuracy (⍴ = `r correlation_mean_nogo_rt_formatted[1, 2]`, P~D~ = `r correlation_mean_nogo_rt_formatted[1, 3]`%) and NoGo P3 latency (⍴ = `r correlation_mean_nogo_rt_formatted[2, 2]`, P~D~ = `r correlation_mean_nogo_rt_formatted[2, 3]`%).
+
+## Figures
+
+See output directory.
+
+```{r figures, message=FALSE, warning=FALSE, include=FALSE}
+source(here("analysis/scripts/r/figure_1C.R"))
+source(here("analysis/scripts/r/figure_2A.R"))
+source(here("analysis/scripts/r/figure_3.R"))
+source(here("analysis/scripts/r/figure_S1.R"))
+source(here("analysis/scripts/r/figure_S2.R"))
+```
+
+# Session info
+
+The statistical analysis was run on `r Sys.Date()`.
+
+```{r echo=FALSE}
+devtools::session_info()
+```
+

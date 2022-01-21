@@ -1,0 +1,39 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<experiment_text language="Swedish">
+  <map name="default">
+    <item key="Instructions">I detta experiment kommer du att få se två olika bokstäver i mitten av skärmen. Bokstäverna kommer att visas en åt gången.
+
+Din enda uppgift är att så snabbt du kan klicka med pekfingret på vänster musknapp när du ser ett X.
+
+Om du ser ett K behöver du inte göra någonting alls. 
+
+Alltså, när du ser ett X ska du så snabbt du kan svara genom att klicka på vänster musknapp, om du ser ett K behöver du inte göra någonting.
+
+Försök svara så snabbt du kan, samtidigt som du svarar rätt.
+
+</item>
+    <item key="No Instructions Caption">Klicka på vänster musknapp för att påbörja nästa del.</item>
+    <item key="Rest Screen Caption">Bra jobbat! Du har kommit halvvägs. Ta en paus och vila lite. Klicka på vänster musknapp när du är redo att fortsätta.</item>
+    <item key="Progress Bar Caption">Så här långt har du kommit:</item>
+    <item key="Practice Caption">När du har förstått instruktionerna kan du klicka på vänster musknapp för att starta en övningsomgång.</item>
+    <item key="Practice Complete Caption">Bra jobbat! Nu är övningen slut. Klicka på vänster musknapp för att påbörja experimentet.</item>
+    <item key="Completion Screen Caption">Du är nu klar med det här experimentet! Tack så mycket för ditt deltagande! Meddela experimentledaren att du är klar.</item>
+    <item key="Block Complete Caption">Du är klar med [BLOCK_NUMBER] omgångar. Experimentet består av totalt [TOTAL_BLOCKS] omgångar. 
+
+Klicka på vänster musknapp för att fortsätta.</item>
+    <item key="Next Screen Caption">Klicka på vänster musknapp för att fortsätta.</item>
+    <item key="Previous Screen Caption">Klicka på vänster musknapp för att gå tillbaka.</item>
+    <item key="Multi-Screen Start Experiment Caption">Klicka på vänster musknapp för att påbörja experimentet när du är redo.</item>
+    <item key="Start Experiment Caption">Klicka på vänster musknapp för att påbörja experimentet när du är redo.</item>
+    <item key="Word Wrap Mode">Ord</item>
+  </map>
+  <map name="Sound">
+    <item key="Instructions">In this experiment, you will hear a series of sounds, presented one at a time. Your only task is to respond as quickly as possible to all sounds EXCEPT for the target sound. 
+
+In this part of the experiment, the target sound is [NOGO_STIMULUS_LABEL]. Anytime you hear  [NOGO_STIMULUS_LABEL], you should make no response.
+
+If you hear any other sound besides [NOGO_STIMULUS_LABEL], respond by clicking the left mouse button as quickly as possible. 
+
+When you are ready to begin, click the left mouse button to move on. Try to respond as quickly as possible while still being accurate.</item>
+  </map>
+</experiment_text>
